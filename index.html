@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#3f7d58">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<title>Lista de la compra</title>
+<style>
+:root{--bg:#f4f7f2;--card:#fff;--fg:#1f2a24;--mut:#6b7a70;--acc:#3f7d58;--accfg:#fff;--line:#dde5de;--rec:#c0554b}
+@media (prefers-color-scheme:dark){:root{--bg:#141a16;--card:#1d2620;--fg:#e6eee8;--mut:#92a398;--acc:#5fb384;--accfg:#0f1d15;--line:#2b372f;--rec:#e0776c}}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--fg);font:17px/1.35 system-ui,-apple-system,Roboto,sans-serif;display:flex;flex-direction:column;padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom)}
+header{padding:18px 16px 8px;display:flex;align-items:baseline;justify-content:space-between}
+h1{font-size:1.5rem;margin:0}
+#count{color:var(--mut);font-size:.95rem}
+main{flex:1;overflow-y:auto;padding:4px 16px 12px}
+ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+li{background:var(--card);border:1px solid var(--line);border-radius:12px;display:flex;align-items:center;gap:14px;padding:6px 14px;min-height:58px;transition:opacity .4s,transform .4s}
+li.done{opacity:.4;transform:translateX(12px)}
+li.done .t{text-decoration:line-through}
+li input{width:28px;height:28px;accent-color:var(--acc);flex:none}
+.t{flex:1;word-break:break-word;font-size:1.1rem}
+.empty{color:var(--mut);text-align:center;margin-top:12vh;padding:0 24px}
+footer{padding:10px 16px 14px;background:var(--bg);border-top:1px solid var(--line)}
+form{display:flex;gap:8px}
+#txt{flex:1;min-width:0;font:inherit;padding:14px;border-radius:12px;border:1px solid var(--line);background:var(--card);color:var(--fg)}
+button{font:inherit;border:0;border-radius:12px;cursor:pointer}
+#add{background:var(--acc);color:var(--accfg);padding:0 16px;font-weight:600}
+#mic{width:100%;margin-top:10px;padding:16px;background:var(--acc);color:var(--accfg);font-weight:600;font-size:1.1rem}
+#mic.on{background:var(--rec);color:#fff;animation:p 1.2s infinite}
+@keyframes p{50%{opacity:.75}}
+#hint{color:var(--mut);font-size:.85rem;margin:8px 2px 0;min-height:1.2em}
+#toast{position:fixed;left:16px;right:16px;bottom:calc(160px + env(safe-area-inset-bottom));background:var(--fg);color:var(--bg);border-radius:12px;padding:12px 16px;display:flex;justify-content:space-between;align-items:center;gap:12px}
+#toast[hidden]{display:none}
+#toast button{background:none;color:var(--acc);font-weight:700;padding:4px 8px}
+</style>
+</head>
+<body>
+<header><h1>Lista de la compra</h1><span id="count"></span></header>
+<main><ul id="list"></ul><p class="empty" id="empty" hidden>La lista está vacía.<br>Pulsa <b>Hablar</b> y di, por ejemplo: «leche, huevos y pan».</p></main>
+<div id="toast" hidden><span id="tmsg"></span><button id="undo" type="button">Deshacer</button></div>
+<footer>
+<form id="f"><input id="txt" placeholder="Escribe un artículo…" autocomplete="off" enterkeyhint="done"><button id="add" type="submit">Añadir</button></form>
+<button id="mic" type="button">🎤 Hablar</button>
+<p id="hint"></p>
+</footer>
+<script>
+const K='compra.items';
+let items=[];try{items=JSON.parse(localStorage.getItem(K)||'[]')}catch(e){}
+const $=id=>document.getElementById(id);
+const save=()=>{try{localStorage.setItem(K,JSON.stringify(items))}catch(e){}};
+function render(){
+  const ul=$('list');ul.innerHTML='';
+  items.forEach(it=>{
+    const li=document.createElement('li');
+    const cb=document.createElement('input');cb.type='checkbox';cb.setAttribute('aria-label','Comprado: '+it.t);
+    cb.onchange=()=>buy(it.id,li);
+    const s=document.createElement('span');s.className='t';s.textContent=it.t;
+    li.append(cb,s);ul.append(li);
+  });
+  $('empty').hidden=items.length>0;
+  $('count').textContent=items.length?items.length+(items.length==1?' artículo':' artículos'):'';
+}
+function cap(s){return s.charAt(0).toUpperCase()+s.slice(1)}
+function add(text){
+  const parts=text.split(/\s*(?:,|;|\s+y\s+|\s+e\s+)\s*/i).map(x=>x.trim()).filter(Boolean);
+  parts.forEach(p=>{
+    if(!items.some(i=>i.t.toLowerCase()==p.toLowerCase()))items.push({id:Date.now()+Math.random(),t:cap(p)});
+  });
+  save();render();
+}
+let undoItem=null,undoIdx=0,tt;
+function buy(id,li){
+  li.classList.add('done');
+  setTimeout(()=>{
+    const i=items.findIndex(x=>x.id==id);if(i<0)return;
+    undoItem=items[i];undoIdx=i;items.splice(i,1);save();render();
+    $('tmsg').textContent='«'+undoItem.t+'» comprado';$('toast').hidden=false;
+    clearTimeout(tt);tt=setTimeout(()=>$('toast').hidden=true,5000);
+  },450);
+}
+$('undo').onclick=()=>{if(undoItem){items.splice(undoIdx,0,undoItem);undoItem=null;save();render()}$('toast').hidden=true};
+$('f').onsubmit=e=>{e.preventDefault();const v=$('txt').value.trim();if(v){add(v);$('txt').value=''}};
+// Voz
+const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+let rec=null,listening=false;
+if(!SR){$('mic').hidden=true;$('hint').textContent='Para dictar, usa el micrófono del teclado Samsung.';}
+else{
+  $('hint').textContent='Puedes dictar varios a la vez: «leche, pan y huevos».';
+  $('mic').onclick=()=>listening?stop():start();
+}
+function start(){
+  rec=new SR();rec.lang='es-ES';rec.continuous=true;rec.interimResults=true;
+  rec.onresult=e=>{
+    let interim='';
+    for(let i=e.resultIndex;i<e.results.length;i++){
+      const r=e.results[i];
+      if(r.isFinal)add(r[0].transcript);else interim+=r[0].transcript;
+    }
+    $('hint').textContent=interim?'Oigo: '+interim:'Escuchando…';
+  };
+  rec.onerror=e=>{$('hint').textContent=e.error=='not-allowed'?'Permite el micrófono en Chrome para esta app.':'Error de voz: '+e.error};
+  rec.onend=()=>{if(listening){try{rec.start()}catch(e){stop()}}else ui(false)};
+  listening=true;ui(true);try{rec.start()}catch(e){}
+}
+function stop(){listening=false;try{rec.stop()}catch(e){}ui(false)}
+function ui(on){$('mic').classList.toggle('on',on);$('mic').textContent=on?'⏹ Parar de escuchar':'🎤 Hablar'}
+render();
+if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
+</script>
+</body>
+</html>
