@@ -19,6 +19,12 @@ h1{font-size:1.5rem;margin:0}
 main{flex:1;overflow-y:auto;padding:4px 16px 12px}
 ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
 li{background:var(--card);border:1px solid var(--line);border-radius:12px;display:flex;align-items:center;gap:14px;padding:6px 14px;min-height:58px;transition:opacity .4s,transform .4s}
+li.sec{background:none;border:0;padding:12px 4px 2px;min-height:0;gap:8px;position:sticky;top:0;z-index:1;backdrop-filter:blur(6px)}
+li.sec i{width:12px;height:12px;border-radius:50%;background:hsl(var(--h) 42% 58%);flex:none}
+li.sec b{font-size:.8rem;letter-spacing:.06em;text-transform:uppercase;color:var(--mut)}
+li.sec span{margin-left:auto;font-size:.8rem;color:var(--mut)}
+.mv{position:relative;flex:none;width:40px;height:40px;display:grid;place-items:center;color:var(--mut);font-size:1.1rem;border-radius:10px}
+.mv select{position:absolute;inset:0;width:100%;height:100%;opacity:0;font-size:16px}
 li.done{opacity:.4;transform:translateX(12px)}
 li.done .t{text-decoration:line-through}
 li input{width:28px;height:28px;accent-color:var(--acc);flex:none}
@@ -52,14 +58,57 @@ const K='compra.items';
 let items=[];try{items=JSON.parse(localStorage.getItem(K)||'[]')}catch(e){}
 const $=id=>document.getElementById(id);
 const save=()=>{try{localStorage.setItem(K,JSON.stringify(items))}catch(e){}};
+// Secciones en el orden habitual de recorrido del súper
+const SEC=[
+ {id:'fru',n:'Frutería y verdura',h:130,k:'manzana platano banana naranja mandarina limon pera uva fresa melon sandia kiwi pina melocoton nectarina cereza aguacate tomate lechuga cebolla ajo patata zanahoria pimiento pepino calabacin berenjena espinaca champinon seta brocoli coliflor puerro apio rucula ensalada verdura fruta perejil albahaca calabaza boniato esparrago col alcachofa mango granada higo ciruela lima pomelo cebolleta rabano remolacha acelga canonigo judia'},
+ {id:'pan',n:'Panadería',h:35,k:'pan barra baguette bollo croissant cruasan hogaza panecillo tostada bocadillo empanada rosquilla'},
+ {id:'car',n:'Carnicería',h:5,k:'pollo ternera cerdo cordero pavo carne filete chuleta hamburguesa salchicha longaniza solomillo costilla conejo pechuga muslo picada lomo pato'},
+ {id:'pes',n:'Pescadería',h:200,k:'pescado merluza salmon gamba langostino calamar sepia pulpo mejillon almeja bacalao dorada lubina sardina boqueron rape lenguado marisco trucha rodaballo'},
+ {id:'cha',n:'Charcutería y quesos',h:15,k:'jamon chorizo salchichon fuet mortadela bacon panceta queso pate morcilla sobrasada york embutido butifarra'},
+ {id:'lac',n:'Lácteos y huevos',h:50,k:'leche yogur yogurt mantequilla nata huevo flan natilla requeson kefir margarina cuajada batido'},
+ {id:'con',n:'Congelados',h:190,k:'congelado helado pizza croqueta nugget empanadilla hielo lasana'},
+ {id:'des',n:'Despensa',h:28,k:'arroz pasta macarron espagueti fideo lenteja garbanzo alubia aceite vinagre sal azucar harina conserva atun sardinilla mayonesa ketchup mostaza salsa caldo sopa especia pimenton aceituna legumbre almendra nuez pipa snack lata pure maiz levadura pan-rallado'},
+ {id:'des2',n:'Desayuno y dulces',h:320,k:'cafe te infusion cacao colacao galleta cereales mermelada miel chocolate bizcocho magdalena donut turron caramelo chicle nocilla manzanilla'},
+ {id:'beb',n:'Bebidas',h:260,k:'agua refresco cola fanta cerveza vino zumo gaseosa tonica ginebra whisky ron vodka cava sidra licor bebida isotonico tinto'},
+ {id:'dro',n:'Droguería y limpieza',h:170,k:'detergente suavizante lejia fregasuelos lavavajillas fairy friegaplatos bayeta estropajo escoba ambientador limpiacristales desengrasante film aluminio pila bombilla fregona guante servilleta'},
+ {id:'hig',n:'Higiene y salud',h:290,k:'champu gel jabon dentifrico cepillo desodorante compresa tampon panal colonia crema maquinilla algodon bastoncillo paracetamol tirita acondicionador mascarilla toallita'},
+ {id:'otr',n:'Otros',h:220,k:''}
+];
+const PHR={'papel higienico':'dro','papel cocina':'dro','papel aluminio':'dro','bolsa basura':'dro','bolsas basura':'dro','bolsa de basura':'dro','bolsas de basura':'dro',
+ 'pasta de dientes':'hig','pan de molde':'pan','pan rallado':'des','aceite de oliva':'des','tomate frito':'des','patatas fritas':'des','patata frita':'des','gel de ducha':'hig','judias verdes':'fru','coca cola':'beb','frutos secos':'des','patatas congeladas':'con','guisantes congelados':'con','crema de':'des','leche de coco':'des','tomate triturado':'des','pimiento del piquillo':'des'};
+const WORD={};SEC.forEach(s=>s.k.split(' ').filter(Boolean).forEach(w=>WORD[w]=s.id));
+const norm=s=>s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9ñ ]+/g,' ').replace(/\s+/g,' ').trim();
+let learn={};try{learn=JSON.parse(localStorage.getItem('compra.learn')||'{}')}catch(e){}
+function classify(t){
+  const n=norm(t);
+  if(learn[n])return learn[n];
+  for(const p in PHR)if((' '+n+' ').includes(' '+p+' '))return PHR[p];
+  for(const w of n.split(' ')){
+    for(const c of [w,w.replace(/s$/,''),w.replace(/es$/,'')])if(WORD[c])return WORD[c];
+  }
+  return 'otr';
+}
+items.forEach(i=>{if(!i.s)i.s=classify(i.t)});
 function render(){
   const ul=$('list');ul.innerHTML='';
-  items.forEach(it=>{
-    const li=document.createElement('li');
-    const cb=document.createElement('input');cb.type='checkbox';cb.setAttribute('aria-label','Comprado: '+it.t);
-    cb.onchange=()=>buy(it.id,li);
-    const s=document.createElement('span');s.className='t';s.textContent=it.t;
-    li.append(cb,s);ul.append(li);
+  SEC.forEach(sec=>{
+    const g=items.filter(i=>i.s==sec.id);if(!g.length)return;
+    const h=document.createElement('li');h.className='sec';h.style.setProperty('--h',sec.h);
+    h.innerHTML='<i></i><b></b><span></span>';
+    h.querySelector('b').textContent=sec.n;h.querySelector('span').textContent=g.length;
+    ul.append(h);
+    g.forEach(it=>{
+      const li=document.createElement('li');
+      const cb=document.createElement('input');cb.type='checkbox';cb.setAttribute('aria-label','Comprado: '+it.t);
+      cb.onchange=()=>buy(it.id,li);
+      const s=document.createElement('span');s.className='t';s.textContent=it.t;
+      const mv=document.createElement('label');mv.className='mv';mv.title='Cambiar de sección';mv.textContent='⇅';
+      const sel=document.createElement('select');sel.setAttribute('aria-label','Sección de '+it.t);
+      SEC.forEach(x=>{const o=document.createElement('option');o.value=x.id;o.textContent=x.n;if(x.id==it.s)o.selected=true;sel.append(o)});
+      sel.onchange=()=>{it.s=sel.value;learn[norm(it.t)]=it.s;try{localStorage.setItem('compra.learn',JSON.stringify(learn))}catch(e){}save();render()};
+      mv.append(sel);
+      li.append(cb,s,mv);ul.append(li);
+    });
   });
   $('empty').hidden=items.length>0;
   $('count').textContent=items.length?items.length+(items.length==1?' artículo':' artículos'):'';
@@ -68,7 +117,7 @@ function cap(s){return s.charAt(0).toUpperCase()+s.slice(1)}
 function add(text){
   const parts=text.split(/\s*(?:,|;|\s+y\s+|\s+e\s+)\s*/i).map(x=>x.trim()).filter(Boolean);
   parts.forEach(p=>{
-    if(!items.some(i=>i.t.toLowerCase()==p.toLowerCase()))items.push({id:Date.now()+Math.random(),t:cap(p)});
+    if(!items.some(i=>i.t.toLowerCase()==p.toLowerCase()))items.push({id:Date.now()+Math.random(),t:cap(p),s:classify(p)});
   });
   save();render();
 }
